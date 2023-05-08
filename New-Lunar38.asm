@@ -5,7 +5,9 @@ HAUT DEFB 3
 VAISAD DEFW 15995 ; adresse mémoire datas du sprite du joueur (3E7BH)
 VAISPOS DEFW 983 ; position du sprite du joueur sur l'écran (15999 / 03D7H)
 ; CHAINE DEFM "ABCDEFGHIJKLMNOPQRSTU" ; Dessin sprite du joueur (3E81H)
-CHAINE DEFM "ABCDEFG HIJKL MN PQR " ; Dessin sprite du joueur (3E81H)
+CHAINE DEFM "ABCDEFG HIJKL  N PQR " ; Dessin sprite du joueur (3E81H)
+;CHAINE DEFM " BCDEFGHIJKLMNOPQRSTU" ; Dessin sprite du joueur (3E81H)
+
 
 ; Fin du test
 ; Version DATA du BASIC
@@ -14,8 +16,8 @@ CHAINE DEFM "ABCDEFG HIJKL MN PQR " ; Dessin sprite du joueur (3E81H)
 ; Test pour map
 MAPL DEFW 981
 MAPR DEFW 995
-MAPL2 DEFW 1046 ; (bloc sur la 2eme ligne a gauche du sprite 1 déplacement à gauche possible)
-MAPR2 DEFW 1054 ; (bloc sur la 2eme ligne a droite du sprite 1 déplacement à droite possible)
+MAPL2 DEFW 1046 ; (bloc sur la 2eme ligne a gauche du sprite mais 1er colonne de la ligne du sprite est vide (32) => 1 déplacement à gauche possible)
+MAPR2 DEFW 1054 ; (bloc sur la 2eme ligne a droite du sprite => 1 déplacement à droite possible)
 MAPSTR DEFM "                                                                "
 ; Fin du test
 
@@ -58,6 +60,7 @@ BOUCLE
 ;    RST 20h              ; DEFB 31H
     CP 8                 ; 
     CALL Z,GAUCHE        ; 
+NEXT    
     CP 26                ; 
     CALL Z,DROITE        ; 
     CP 77                ; Touche Tir (W)
@@ -83,20 +86,52 @@ SUITE
 ; Décale le sprite du joueur d'une colonne vers la gauche
 GAUCHE
     LD HL,(VAISPOS)
+    PUSH HL
     DEC HL
 
-    ; teste si le décalage à gauche est autorisé
-    LD A,(HL)
-    ; Vérifie si la position est libre
-    CP 32
-    RET NZ
+    LD IX,(VAISAD)
+    LD A,(IX+1) ; Charge dans le compteur le nb de lignes du sprite
+    LD (CPTLIG),A
 
-    LD (VAISPOS),HL
+; teste si le décalage à gauche est autorisé
+NXTLEFT
+    LD A,(HL) ; charge le contenu de la map à cette adresse
+
+    CP 32
+    JP Z NXLEFT2 ; emplacement libre, passe à la ligne suivante
+
+; Doit contrôler la valeur du contenu du sprite du joueur si 32 alors ok
+DATLEFT
+    INC HL
+    LD A,(HL)
+    CP 32 
+    JP NZ,EXLEFT2 ; déplacement interdit
+
+NXLEFT2
+    ; Sort si c'était la dernière ligne du sprite
+    LD A,(CPTLIG) ; hauteur (3)
+    DEC A
+    JP Z,EXLEFT ; déplacement autorisé
+
+    LD (CPTLIG),A
+
+    LD BC,COLUMNS ; (64)
+    ADD HL,BC ; Pour le test en cours : 1046 (Avant l'espace du H à la 2eme ligne du sprite du joueur)
+
+    JP NXTLEFT
+
+EXLEFT
     ; signale le décalage de l'affichage du sprite du joueur à gauche
     LD A,2
     LD (SHWPLAY),A
+    POP HL
 
-    RET
+EXLEFT2
+    LD A,(SHWPLAY)
+    CP 2
+    JP NZ,NEXT ; déplacement interdit ; Pas possible de mettre un RET
+    DEC HL
+    LD (VAISPOS),HL ; enregistre la nouvelle position du sprite du joueur
 
 ; Décale le sprite du joueur d'une colonne vers la droite
 DROITE
