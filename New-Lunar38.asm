@@ -1,27 +1,21 @@
    ORG 15995 ; pointeur d'adresse pour charger les données du jeux (sprites)
 ; Pour test crée le sprite en mémoire (A ajouter dans les DATA du basic)
-LARGE DEFB 7
-HAUT DEFB 3
+LARGE DEFB 4
+HAUT DEFB 2
 VAISAD DEFW 15995 ; adresse mémoire datas du sprite du joueur (3E7BH)
-VAISPOS DEFW 983 ; position du sprite du joueur sur l'écran (15999 / 03D7H)
-; CHAINE DEFM "ABCDEFGHIJKLMNOPQRSTU" ; Dessin sprite du joueur (3E81H)
-CHAINE DEFM "ABCDEFG HIJKL  N PQR " ; Dessin sprite du joueur (3E81H)
-;CHAINE DEFM " BCDEFGHIJKLMNOPQRSTU" ; Dessin sprite du joueur (3E81H)
-
-
+VAISPOS DEFW 983 ; position de départ du sprite du joueur sur l'écran (15999 / 03D7H)
+CHAINE DEFM "ABCDEFGHIJ" ; Exemple de dessin sprite du joueur (3E81H)
 ; Fin du test
 ; Version DATA du BASIC
 ; DATA 07,03,123,62,215,3,65,66,67,68,...
 
-; Test pour map
-MAPL DEFW 981
-MAPR DEFW 995
-MAPL2 DEFW 1046 ; (bloc sur la 2eme ligne a gauche du sprite mais 1er colonne de la ligne du sprite est vide (32) => 1 déplacement à gauche possible)
-MAPR2 DEFW 1054 ; (bloc sur la 2eme ligne a droite du sprite => 1 déplacement à droite possible)
-MAPSTR DEFM "                                                                "
+; Test pour map en mémoire
+MAPLINE1 DEFM "X             X" ; 3EEF
+MAPLINE2 DEFM "Y             Y"
+;MAPADR DEFS 500 ; 500 emplacements mémoire pour stockage datas de la map plus tard a augmenter + tard / pour l'instant la map est créée en mémoire par MAPLINE1 et MAPLINE2
 ; Fin du test
 
-COLUMNS EQU 64 ; Ligne suivante de l'écran
+COLUMNS EQU 15 ; Ligne suivante de l'écran
 CPTLIG DEFB 0 ; permet de décrémenter le nb de lignes affichées pour un sprite
 SHWPLAY DEFB 1 ; permet de détecter si le sprite du joueur doit être réaffiché à l'écran
 ; 1 => affiche à la position de démarrage
@@ -33,31 +27,25 @@ SHWPLAY DEFB 1 ; permet de détecter si le sprite du joueur doit être réaffich
     PUSH IX
     PUSH IY
 
-    ; Test chargement de la map
-    LD HL,MAPSTR
-    LD DE,962
+    ; Test placement de la map en mémoire sur l'écran - simulation sur 2 lignes
+    ; ligne 1
+    LD HL,MAPLINE1
+    LD DE,981
+    LD BC,COLUMNS
+    LDIR ;(DE) <- (HL) BC--  (981 / 03D7) <- (16024 / 3E98) affiche la ligne courante du sprite
+
+    ; ligne 2
+    LD HL,MAPLINE2
     LD BC,COLUMNS
     LDIR
-
-    LD HL,MAPSTR
-    LD DE,1037
-    LD BC,COLUMNS
-    LDIR
-
-    LD IX,(MAPL)
-    LD (IX),255
-    LD IX,(MAPR)
-    LD (IX),255
-
-    LD IX,(MAPL2)
-    LD (IX),255
-    LD IX,(MAPR2)
-    LD (IX),255
     ;:Fin du test
 
+; Boucle principale du moteur
 BOUCLE
 ;    LD E,01              ; 
 ;    RST 20h              ; DEFB 31H
+    ;LD A,8 ; par défaut a gauche pour le test
+
     CP 8                 ; 
     CALL Z,GAUCHE        ; 
 NEXT    
@@ -104,14 +92,14 @@ NXTLEFT
 DATLEFT
     INC HL
     LD A,(HL)
-    CP 32 
+    CP 32
     JP NZ,EXLEFT2 ; déplacement interdit
 
 NXLEFT2
     ; Sort si c'était la dernière ligne du sprite
-    LD A,(CPTLIG) ; hauteur (3)
+    LD A,(CPTLIG) ; hauteur
     DEC A
-    JP Z,EXLEFT ; déplacement autorisé
+    JP Z,EXLEFT ; dernière ligne du sprite et déplacement autorisé
 
     LD (CPTLIG),A
 
@@ -132,6 +120,7 @@ EXLEFT2
     JP NZ,NEXT ; déplacement interdit ; Pas possible de mettre un RET
     DEC HL
     LD (VAISPOS),HL ; enregistre la nouvelle position du sprite du joueur
+    JP NEXT ; Pas possible de mettre un RET
 
 ; Décale le sprite du joueur d'une colonne vers la droite
 DROITE
@@ -170,7 +159,7 @@ NXTLINE
     LD C,(IX+0) ; largeur (7)
 
     LD A,(SHWPLAY)
-    CP 3
+    CP 3 ; vrai si décalage à droite
     JP NZ,DISPLINE
 TORIGHT
     EX DE,HL ; premiere ligne ok DE = 983 deuxieme ligne ko DE = 1048 au lieu de 1047
@@ -179,9 +168,13 @@ TORIGHT
     INC DE
 
 DISPLINE
+    LD A,(DE)
+    CP 32
+    CALL NZ,NODELEFT
     LDIR ; (DE) <- (HL) BC--  (983 / 03D7H) <- (16001 / 3E81H) affiche la ligne courante du sprite
 
     ; Test si décalage du sprite du joueur à gauche
+    LD A,(SHWPLAY)
     CP 2
     JP NZ,NXTLINE2
 TOLEFT ;supprime le caractère de droite de la ligne du sprite du joueur sur l'écran
@@ -233,6 +226,14 @@ UPDEND
     LD (SHWPLAY),A
 
     RET
+
+;;;;;;;;;;;;;
+NODELEFT ; le caractère du joueur est un espace mais le caractère de la ligne de la map à gauche n'en est pas un, il ne faut donc pas effacer le caractère de la map et passer au caractère suivant à afficher
+    INC HL
+    INC DE
+    DEC BC
+    RET
+;;;;;;;;;;;;;;
 FIN
     POP IY
     POP IX
