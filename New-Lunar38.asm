@@ -12,15 +12,15 @@ VAISPOS DEFW 983 ; position de départ du sprite du joueur sur l'écran (15999 /
 MAPHAUT DEFB 2 ; nombre de lignes de la map à afficher sur l'écran
 MAPPOS DEFW 981 ;
 ; SPRJOU DEFM "ABCD FGH" ; Exemple de dessin sprite du joueur en mémoire (3E81) => Cas 1 OK
-SPRJOU DEFM " BCDEFGH" ; Exemple de dessin sprite du joueur en mémoire (3E81)
+SPRJOU DEFM "ABC EFG " ; Exemple de dessin sprite du joueur en mémoire (3E81)
 
 ; Fin du test
 ; Version DATA du BASIC
 ; DATA 07,03,123,62,215,3,65,66,67,68,...
 
 ; Test pour map en mémoire
-MAPLINE1 DEFM "X             X" ; 3E8C
-MAPLINE2 DEFM "Y             Y"
+MAPLINE1 DEFM "X       U     X" ; 3E8C
+MAPLINE2 DEFM "Y       U     Y"
 ;MAPDATA DEFS 500 ; 500 emplacements mémoire pour stockage datas de la map plus tard a augmenter + tard / pour l'instant la map est créée en mémoire par MAPLINE1 et MAPLINE2
 ; Fin du test
 
@@ -63,9 +63,10 @@ BOUCLE
 NEXT    
     CP 26                ; 
     CALL Z,DROITE        ; 
+NEXT2    
     CP 77                ; Touche Tir (W)
     CALL Z,TIR           ; Charge l'@ mémoire initiale de la balle gauche et droite sur l'écran
-
+NEXT3
     ; Dessine toujours le sprite du joueur à l'écran
     LD HL,SPRJOU
     LD IX,(VAISDATA)
@@ -123,7 +124,7 @@ NXLEFT2
     ADD HL,BC ; (16008) 2eme ligne de dessin du sprite du joueur
     LD (SAVJOU),HL
 
-    POP HL ; <== PB 2 push HL au deuxieme passage
+    POP HL
     LD BC,COLVIRT ; (20)
     ADD HL,BC ; (1002) se positionne sur l'adresse de la prochaine ligne de la map à l'écran
 
@@ -138,6 +139,7 @@ EXLEFT2
     LD A,(SHWPLAY)
     CP 2
     JP NZ,NEXT ; déplacement interdit ; Pas possible de mettre un RET
+
     LD HL,(VAISPOS)
     DEC HL
     LD (VAISPOS),HL ; enregistre la nouvelle position du sprite du joueur
@@ -145,29 +147,87 @@ EXLEFT2
 
 ; Décale le sprite du joueur d'une colonne vers la droite
 DROITE
-    LD HL,(VAISPOS) ; 983 (A)
-    PUSH HL ; sauvegarde @ mémoire du sprite du joueur (15995 / 3E7BH)
-    
+    LD HL,SPRJOU 
+    LD (SAVJOU),HL ; pour conserver l'adresse mémoire de la ligne du sprite en cours de contrôle
+
+    LD HL,(VAISPOS)
+    ;INC HL
+    PUSH HL
+
+    LD A,(HAUT) ; Charge dans le compteur le nb de lignes du sprite
+    LD (CPTLIG),A
+
+    LD IX,(VAISDATA)
     LD B,0
-    LD C,(IX+0) ; largeur
-    ADD HL,BC ; 990 (Après le G)
+    LD C,(IX) ; largeur
+    ADD HL,BC ; (988)
 
-    ; teste si le décalage à droite est autorisé
-    LD A,(HL)
-    POP HL ; récupère la sauvegarde de la position actuelle
-    ; Vérifie si la position est libre
+; teste si le décalage à droite est autorisé
+NXTRIGHT
+    LD A,(HL) ; charge le contenu de la map sur l'écran à cette adresse - (989 1ere ligne)
+
     CP 32
-    RET NZ
+    JP Z NXRIGHT2 ; emplacement ligne de map libre, passe à la ligne suivante
 
-    LD (VAISPOS),HL
+; Doit contrôler la valeur du contenu du sprite du joueur si 32 alors ok
+DATRIGHT
+    LD HL,(SAVJOU)
+    LD B,0
+    LD C,(IX) ; largeur
+    ADD HL,BC
+    DEC HL ; dernier caractère du sprite du joueur pour la ligne traitée
+
+    LD A,(HL)
+    CP 32
+    JP NZ,EXRIGHT2 ; déplacement interdit
+    POP HL
+
+NXRIGHT2
+    ; Sort si c'était la dernière ligne du sprite
+    LD A,(CPTLIG) ; hauteur
+    DEC A
+    JP Z,EXRIGHT ; dernière ligne du sprite et déplacement autorisé
+
+    LD (CPTLIG),A ; enregistre le nombre de lignes du sprite du joueur restant à controler
+
+    PUSH HL ; 984 premier passage premiere ligne, 1004 deuxieme ligne
+    ; se positionne sur le dessin en mémoire de la prochaine ligne du sprite du joueur
+    LD HL,SPRJOU ; Charge HL avec l'@ de début des données de la map
+
+    ; déja fait dans NXTRIGHT
+    ;LD IX,(VAISDATA) ; Charge IX avec l'@ de début des données du joueur (15995)
+    ;LD B,0
+    ;LD C,(IX+0) ; (4) largeur d'une ligne sprite du joueur
+    ADD HL,BC ; (16008) 2eme ligne de dessin du sprite du joueur
+    LD (SAVJOU),HL
+
+    POP HL
+    ADD HL,BC ; ajoute la largeur du sprite du joueur
+    LD BC,COLVIRT ; (20)
+    ADD HL,BC ; (1004) se positionne sur l'adresse de la prochaine ligne de la map à droite de l'écran
+
+    JP NXTRIGHT
+
+EXRIGHT
     ; signale le décalage de l'affichage du sprite du joueur à droite
     LD A,3
     LD (SHWPLAY),A
-    RET
+
+EXRIGHT2
+    LD A,(SHWPLAY)
+    CP 3
+    JP NZ,NEXT2 ; déplacement interdit ; Pas possible de mettre un RET
+
+    ; ATTENTION : la position du joueur est sauvgardée dans DISSPRIT
+    ;LD HL,(VAISPOS)
+    ;INC HL
+    ;LD (VAISPOS),HL ; enregistre la nouvelle position du sprite du joueur
+
+    JP NEXT2 ; Pas possible de mettre un RET
 
 ; Gère la fonction du tir du sprite du joueur
 TIR
-    RET
+    JP NEXT3 ; Pas possible de mettre un RET
 
 ; Fonction permettant d'afficher un sprite à l'écran
 DISSPRIT
