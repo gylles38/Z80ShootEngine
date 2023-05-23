@@ -25,6 +25,7 @@ MAPLINE2 DEFM "Y       U     Y"
 ; Fin du test
 
 SAVJOU DEFW 0 ; permet de tester le contenu de la ligne suivante du sprite
+NBSPAC DEFW 0 ; permet de compter le nombre de lignes du sprite contenant un espace en fonction du sens de déplacement demandé
 CPTLIG DEFB 0 ; permet de décrémenter le nb de lignes affichées pour un sprite
 CPTMAP DEFB 0 ; permet de décrémenter le nb de lignes affichées pour la map
 SHWPLAY DEFB 1 ; permet de détecter si le sprite du joueur doit être réaffiché à l'écran
@@ -35,7 +36,7 @@ SHWPLAY DEFB 1 ; permet de détecter si le sprite du joueur doit être réaffich
 ; 5 => décale d'une position en bas @TODO
 
 BEGIN
-    PUSH IX ; 3e7f
+    PUSH IX ; 3eb1
     PUSH IY
 
 ; Initialisation des paramètres
@@ -83,8 +84,15 @@ SUITE
 GAUCHE
     LD HL,SPRJOU 
     LD (SAVJOU),HL ; pour conserver l'adresse mémoire de la ligne du sprite en cours de contrôle
+    LD HL,0
+    LD (NBSPAC),HL ; pour conserver le nombre de lignes du sprite ayant 32 à gauche
 
     LD HL,(VAISPOS)
+    ; vérifions tout d'abord que le sprite n'est pas déjà dans le cas ou la ligne du sprite à 32 à gauche et qu'il chevauche déjà la map
+    LD A,(HL)
+    CP 32
+    JP NZ,NEXT ; déplacement interdit ; Pas possible de mettre un RET
+
     DEC HL
     PUSH HL
 
@@ -104,7 +112,10 @@ DATLEFT
 
     LD A,(HL)
     CP 32
-    JP NZ,EXLEFT2 ; déplacement interdit
+    JP NZ,EXLEFT3 ; déplacement interdit
+    LD A,(NBSPAC)
+    INC A
+    LD (NBSPAC),A ; incrémente le nombre de lignes du sprite dont la valeur est 32 à gauche
     POP HL
 
 NXLEFT2
@@ -131,27 +142,51 @@ NXLEFT2
     JP NXTLEFT
 
 EXLEFT
-    ; signale le décalage de l'affichage du sprite du joueur à gauche
-    LD A,2
+    LD A,(NBSPAC)
+    LD IX,HAUT
+    SUB (IX)
+    CP 0
+    JP NZ,EXLEFT2
+    ; cas particulier ou toutes les colonnes du sprite du joueur on un espace à gauche, il ne faut pas écraser la colonne de la map
+    LD A,21 ; 21 => déplacement autorisé à gauche sans écraser la colonne de la map
     LD (SHWPLAY),A
+    JP EXLEFT3
 
 EXLEFT2
+    ; signale le décalage normal de l'affichage du sprite du joueur à gauche
+    LD A,2 ; 2 => déplacement normal autorisé à gauche
+    LD (SHWPLAY),A
+
+EXLEFT3
     LD A,(SHWPLAY)
     CP 2
-    JP NZ,NEXT ; déplacement interdit ; Pas possible de mettre un RET
+    JP NZ,EXLEFT4
 
     LD HL,(VAISPOS)
     DEC HL
     LD (VAISPOS),HL ; enregistre la nouvelle position du sprite du joueur
-    JP NEXT ; Pas possible de mettre un RET
+    JP NEXT ; déplacement normal autorisé retourne dans la boucle principale ; Pas possible de mettre un RET
+
+EXLEFT4
+    CP 21
+    JP NZ,NEXT ; déplacement interdit retourne dans la boucle principale ; Pas possible de mettre un RET
+
+    LD HL,(VAISPOS)
+    DEC HL
+    LD (VAISPOS),HL ; enregistre la nouvelle position du sprite du joueur
+    JP NEXT ; déplacement autorisé sans écraser la colonne de la map ; retourne dans la boucle principale ; Pas possible de mettre un RET
+
+    JP NZ,NEXT ; déplacement interdit retourne dans la boucle principale ; Pas possible de mettre un RET
 
 ; Décale le sprite du joueur d'une colonne vers la droite
 DROITE
     LD HL,SPRJOU 
     LD (SAVJOU),HL ; pour conserver l'adresse mémoire de la ligne du sprite en cours de contrôle
 
+    LD HL,0
+    LD (NBSPAC),HL ; pour conserver le nombre de lignes du sprite ayant 32 à droite
+
     LD HL,(VAISPOS)
-    ;INC HL
     PUSH HL
 
     LD A,(HAUT) ; Charge dans le compteur le nb de lignes du sprite
@@ -235,13 +270,19 @@ DISSPRIT
     LD E,(IX+4) ; DE adresse position du sprite sur l'écran
 NXTLINE
     LD B,0
-    LD C,(IX+0) ; largeur (7)
+    LD C,(IX+0) ; largeur (4)
 
     LD A,(SHWPLAY)
     CP 3 ; vrai si décalage à droite
     JP NZ,DISPLINE ; si faux
+
 TORIGHT
-    EX DE,HL ; premiere ligne ok DE = 983 deuxieme ligne ko DE = 1048 au lieu de 1047
+    ; Vérifie que le sprite n'est pas déjà dans le cas ou sa ligne est à 32 sur son coté gauche, qu'il chevauche déjà la map et que la direction est à droite
+    LD A,(HL)
+    CP 32
+    CALL Z,NODELEFT ; c'est le cas, il ne faut donc pas effacer le caractère à gauche car c'est un caractère de la map
+
+    EX DE,HL ; premiere ligne ok DE = 983 deuxieme ligne ok DE = 1047
     LD (HL),32
     EX DE,HL
     INC DE
@@ -249,13 +290,15 @@ TORIGHT
 DISPLINE
     LD A,(DE)
     CP 32
-    CALL NZ,NODELEFT ; TODO : A VERIFIER !
-    LDIR ; (DE) <- (HL) BC--  (983 / 03D7H) <- (16001 / 3E81H) affiche la ligne courante du sprite
+    ; Vérifie que le sprite n'est pas déjà dans le cas ou sa ligne est à 32 sur son coté gauche, qu'il chevauche déjà la map et que la direction est à gauche    
+    CALL NZ,NODELEFT ; c'est le cas, il ne faut donc pas effacer le caractère à gauche car c'est un caractère de la map
+    LDIR ; (DE) <- (HL) BC-- ; affiche la ligne courante du sprite
 
-    ; Test si décalage du sprite du joueur à gauche
+    ; Test si décalage normal du sprite du joueur à gauche
     LD A,(SHWPLAY)
     CP 2
     JP NZ,NXTLINE2
+
 TOLEFT ;supprime le caractère de droite de la ligne du sprite du joueur sur l'écran
     EX DE,HL
     LD (HL),32
@@ -308,7 +351,7 @@ UPDEND
 
 DRAWMAP ; affiche la map depuis la mémoire sur l'écran
     ; Test placement de la map en mémoire sur l'écran - simulation sur 2 lignes
-    ; ligne
+    ; ligne 1
     LD DE,981
     LD BC,COLREAL
     LDIR ;(DE) <- (HL) BC--  (981 / 03D7) <- (16024 / 3E98) affiche la ligne courante du sprite
@@ -324,13 +367,13 @@ DRAWMAP ; affiche la map depuis la mémoire sur l'écran
     ;:Fin du test
     RET
 
-;;;;;;;;;;;;;
-NODELEFT ; le caractère du joueur est un espace mais le caractère de la ligne de la map à gauche n'en est pas un, il ne faut donc pas effacer le caractère de la map et passer au caractère suivant à afficher
+; le caractère du joueur est un espace mais le caractère de la ligne de la map à gauche n'en est pas un, il ne faut donc pas effacer le caractère de la map et passer au caractère suivant à afficher
+NODELEFT
     INC HL
     INC DE
     DEC BC
     RET
-;;;;;;;;;;;;;;
+
 FIN
     POP IY
     POP IX
