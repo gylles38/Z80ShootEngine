@@ -25,7 +25,7 @@ MAPLINE2 DEFM "Y       U     Y"
 ; Fin du test
 
 SAVJOU DEFW 0 ; permet de tester le contenu de la ligne suivante du sprite
-NBSPAC DEFW 0 ; permet de compter le nombre de lignes du sprite contenant un espace en fonction du sens de déplacement demandé
+NBSPAC DEFW 0 ; permet de compter le nombre de lignes du sprite contenant un espace sur un coté en fonction du sens de déplacement demandé
 CPTLIG DEFB 0 ; permet de décrémenter le nb de lignes affichées pour un sprite
 CPTMAP DEFB 0 ; permet de décrémenter le nb de lignes affichées pour la map
 SHWPLAY DEFB 1 ; permet de détecter si le sprite du joueur doit être réaffiché à l'écran
@@ -176,10 +176,14 @@ EXLEFT4
     LD (VAISPOS),HL ; enregistre la nouvelle position du sprite du joueur
     JP NEXT ; déplacement autorisé sans écraser la colonne de la map ; retourne dans la boucle principale ; Pas possible de mettre un RET
 
-    JP NZ,NEXT ; déplacement interdit retourne dans la boucle principale ; Pas possible de mettre un RET
+    ; JP NZ,NEXT ; déplacement interdit retourne dans la boucle principale ; Pas possible de mettre un RET
 
 ; Décale le sprite du joueur d'une colonne vers la droite
 DROITE
+    LD IX,(VAISDATA)
+    LD B,0
+    LD C,(IX) ; largeur
+
     LD HL,SPRJOU 
     LD (SAVJOU),HL ; pour conserver l'adresse mémoire de la ligne du sprite en cours de contrôle
 
@@ -192,15 +196,24 @@ DROITE
     LD A,(HAUT) ; Charge dans le compteur le nb de lignes du sprite
     LD (CPTLIG),A
 
-    LD IX,(VAISDATA)
-    LD B,0
-    LD C,(IX) ; largeur
-    ADD HL,BC ; (988)
+    ; vérifie si la colonne de droite du sprite du joueur est un espace
+    LD HL,SPRJOU   
+    ADD HL,BC
+    DEC HL
+    LD A,(HL)
+    POP HL ; (VAISPOS)
+    CP 32
+    JP NZ,NXTRIGHT ; ce n'est pas le cas
+    ; vérifie maintenant si l'espace du sprite du joueur est sur un bloc de la map
+    ADD HL,BC
+    DEC HL
+    LD A,(HL)
+    CP 32
+    JP NZ,NEXT2 ; c'est le cas, déplacement à droite interdit retourne dans la boucle principale ; Pas possible de mettre un RET    
 
 ; teste si le décalage à droite est autorisé
 NXTRIGHT
-    LD A,(HL) ; charge le contenu de la map sur l'écran à cette adresse - (989 1ere ligne)
-
+    LD A,(HL) ; charge le contenu de la map sur l'écran à cette adresse
     CP 32
     JP Z NXRIGHT2 ; emplacement ligne de map libre, passe à la ligne suivante
 
@@ -215,6 +228,10 @@ DATRIGHT
     LD A,(HL)
     CP 32
     JP NZ,EXRIGHT2 ; déplacement interdit
+
+    LD A,(NBSPAC)
+    INC A
+    LD (NBSPAC),A ; incrémente le nombre de lignes du sprite dont la valeur est 32 à droite
     POP HL
 
 NXRIGHT2
@@ -244,21 +261,37 @@ NXRIGHT2
     JP NXTRIGHT
 
 EXRIGHT
-    ; signale le décalage de l'affichage du sprite du joueur à droite
-    LD A,3
+    LD A,(NBSPAC)
+    LD IX,HAUT
+    SUB (IX)
+    CP 0
+    JP NZ,EXRIGHT2
+    ; cas particulier ou toutes les colonnes du sprite du joueur on un espace à droite, il ne faut pas écraser la colonne de la map
+    LD A,31 ; 31 => déplacement autorisé à droite MAIS sans écraser la colonne de la map
     LD (SHWPLAY),A
+    JP EXRIGHT3
 
 EXRIGHT2
+    ; signale le décalage de l'affichage du sprite du joueur à droite
+    LD A,3 ; 3 => déplacement normal autorisé à droite
+    LD (SHWPLAY),A
+
+EXRIGHT3
     LD A,(SHWPLAY)
     CP 3
-    JP NZ,NEXT2 ; déplacement interdit ; Pas possible de mettre un RET
+    JP NZ,EXRIGHT4
 
-    ; ATTENTION : la position du joueur est sauvgardée dans DISSPRIT
-    ;LD HL,(VAISPOS)
-    ;INC HL
-    ;LD (VAISPOS),HL ; enregistre la nouvelle position du sprite du joueur
+    JP NEXT2 ; déplacement normal autorisé retourne dans la boucle principale ; Pas possible de mettre un RET
 
-    JP NEXT2 ; Pas possible de mettre un RET
+EXRIGHT4
+    CP 31
+    JP NZ,NEXT2 ; déplacement interdit retourne dans la boucle principale ; Pas possible de mettre un RET
+
+    LD HL,(VAISPOS)
+    INC HL
+    LD (VAISPOS),HL ; enregistre la nouvelle position du sprite du joueur
+
+    JP NEXT2 ; déplacement autorisé sans écraser la colonne de la map ; retourne dans la boucle principale ; Pas possible de mettre un RET
 
 ; Gère la fonction du tir du sprite du joueur
 TIR
@@ -277,6 +310,7 @@ NXTLINE
     JP NZ,DISPLINE ; si faux
 
 TORIGHT
+    ; TODO : la condition n'est sans doute pas bonne dans tous les cas, il faut comparer par rapport aux données de la map
     ; Vérifie que le sprite n'est pas déjà dans le cas ou sa ligne est à 32 sur son coté gauche, qu'il chevauche déjà la map et que la direction est à droite
     LD A,(HL)
     CP 32
@@ -292,6 +326,18 @@ DISPLINE
     CP 32
     ; Vérifie que le sprite n'est pas déjà dans le cas ou sa ligne est à 32 sur son coté gauche, qu'il chevauche déjà la map et que la direction est à gauche    
     CALL NZ,NODELEFT ; c'est le cas, il ne faut donc pas effacer le caractère à gauche car c'est un caractère de la map
+
+    ; Vérifie que le sprite n'est pas déjà dans le cas ou sa ligne est à 32 sur son coté droit, qu'il chevauche déjà la map et que la direction est à droite
+    EX DE,HL
+    PUSH HL
+    ADD HL,BC
+    DEC HL
+    LD A,(HL)
+    POP HL
+    EX DE,HL
+    CP 32
+    CALL NZ,NODERIGHT ; c'est le cas, il ne faut donc pas effacer le caractère à droite car c'est un caractère de la map
+
     LDIR ; (DE) <- (HL) BC-- ; affiche la ligne courante du sprite
 
     ; Test si décalage normal du sprite du joueur à gauche
@@ -299,7 +345,14 @@ DISPLINE
     CP 2
     JP NZ,NXTLINE2
 
-TOLEFT ;supprime le caractère de droite de la ligne du sprite du joueur sur l'écran
+TOLEFT 
+    ; TODO : la condition n'est sans doute pas bonne dans tous les cas, il faut comparer par rapport aux données de la map
+    ; Vérifie que le sprite n'est pas déjà dans le cas ou sa ligne est à 32 sur son coté droit, qu'il chevauche déjà la map et que la direction est à gauche
+    LD A,(HL)
+    CP 32
+    CALL Z,NODERIGHT ; c'est le cas, il ne faut donc pas effacer le caractère à gauche car c'est un caractère de la map
+
+    ;supprime le caractère de droite de la ligne du sprite du joueur sur l'écran
     EX DE,HL
     LD (HL),32
     EX DE,HL
@@ -373,6 +426,12 @@ NODELEFT
     INC DE
     DEC BC
     RET
+
+; le caractère du joueur est un espace mais le caractère de la ligne de la map à droite n'en est pas un, il ne faut donc pas effacer le caractère de la map et passer au caractère suivant à afficher
+NODERIGHT
+   DEC BC
+    RET
+
 
 FIN
     POP IY
