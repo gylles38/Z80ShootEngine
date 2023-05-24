@@ -185,49 +185,50 @@ DROITE
     LD C,(IX) ; largeur
 
     LD HL,SPRJOU 
-    LD (SAVJOU),HL ; pour conserver l'adresse mémoire de la ligne du sprite en cours de contrôle
+    LD (SAVJOU),HL ; pour conserver l'adresse mémoire de la ligne du sprite en cours de contrôle 16004
 
     LD HL,0
     LD (NBSPAC),HL ; pour conserver le nombre de lignes du sprite ayant 32 à droite
 
-    LD HL,(VAISPOS)
+    LD HL,(VAISPOS) ; 985
     PUSH HL
 
     LD A,(HAUT) ; Charge dans le compteur le nb de lignes du sprite
     LD (CPTLIG),A
 
     ; vérifie si la colonne de droite du sprite du joueur est un espace
-    LD HL,SPRJOU
+    LD HL,SPRJOU ; 16004
     ADD HL,BC
     DEC HL
-    LD A,(HL)
-    POP HL ; (VAISPOS)
+    LD A,(HL) ; (16007) = 32
+    POP HL ; (VAISPOS) 985
     CP 32
     JP NZ,NXTRIGHT ; ce n'est pas le cas
-    ; vérifie maintenant si l'espace du sprite du joueur est sur un bloc de la map
+    ; vérifie maintenant si l'espace du sprite du joueur est sur un bloc de la map avant son éventuel déplacement
     ADD HL,BC
-    DEC HL
-    LD A,(HL)
+    DEC HL ; 988
+    LD A,(HL) ; 32
     CP 32
     JP NZ,NEXT2 ; c'est le cas, déplacement à droite interdit retourne dans la boucle principale ; Pas possible de mettre un RET    
 
 ; teste si le décalage à droite est autorisé
-NXTRIGHT
-    LD A,(HL) ; charge le contenu de la map sur l'écran à cette adresse
-    CP 32
-    JP Z NXRIGHT2 ; emplacement ligne de map libre, passe à la ligne suivante
+;NXTRIGHT
+;    INC HL
+;    LD A,(HL) ; charge le contenu de la map sur l'écran à cette adresse (989) = 85 U
+;    CP 32
+;    JP Z NXRIGHT2 ; emplacement ligne de map libre, passe à la ligne suivante
 
 ; Doit contrôler la valeur du contenu du sprite du joueur si 32 alors ok
-DATRIGHT
+NXTRIGHT
     LD HL,(SAVJOU)
     LD B,0
     LD C,(IX) ; largeur
     ADD HL,BC
     DEC HL ; dernier caractère du sprite du joueur pour la ligne traitée
 
-    LD A,(HL)
-    CP 32
-    JP NZ,EXRIGHT2 ; déplacement interdit
+    ;LD A,(HL)
+    ;CP 32
+    ;JP NZ,EXRIGHT2 ; déplacement interdit
 
     LD A,(NBSPAC)
     INC A
@@ -242,21 +243,17 @@ NXRIGHT2
 
     LD (CPTLIG),A ; enregistre le nombre de lignes du sprite du joueur restant à controler
 
-    PUSH HL ; 984 premier passage premiere ligne, 1004 deuxieme ligne
+    PUSH HL ; 988
     ; se positionne sur le dessin en mémoire de la prochaine ligne du sprite du joueur
-    LD HL,SPRJOU ; Charge HL avec l'@ de début des données de la map
+    LD HL,SPRJOU ; Charge HL avec l'@ de début des données de la map 16004
 
-    ; déja fait dans NXTRIGHT
-    ;LD IX,(VAISDATA) ; Charge IX avec l'@ de début des données du joueur (15995)
-    ;LD B,0
-    ;LD C,(IX+0) ; (4) largeur d'une ligne sprite du joueur
-    ADD HL,BC ; (16008) 2eme ligne de dessin du sprite du joueur
+    ADD HL,BC ; 1012 2eme ligne de dessin du sprite du joueur
     LD (SAVJOU),HL
 
-    POP HL
-    ADD HL,BC ; ajoute la largeur du sprite du joueur
+    POP HL ; 988
+    ;ADD HL,BC ; ajoute la largeur du sprite du joueur 992 ==> FAUX
     LD BC,COLVIRT ; (20)
-    ADD HL,BC ; (1004) se positionne sur l'adresse de la prochaine ligne de la map à droite de l'écran
+    ADD HL,BC ; (1008) se positionne sur l'adresse de la prochaine ligne de la map à droite de l'écran
 
     JP NXTRIGHT
 
