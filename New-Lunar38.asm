@@ -197,7 +197,7 @@ DROITE
     LD (CPTLIG),A
 
     ; vérifie si la colonne de droite du sprite du joueur est un espace
-    LD HL,SPRJOU   
+    LD HL,SPRJOU
     ADD HL,BC
     DEC HL
     LD A,(HL)
@@ -322,12 +322,16 @@ TORIGHT
     INC DE
 
 DISPLINE
+   ; LD A,(SHWPLAY)
+   ; CP 2 ; vrai si décalage à gauche normal ; TODO : si Décalage à gauche de type 21 que fait t'on ?
+   ; JP NZ, DISPLINE2 ; faux
+
     LD A,(DE)
     CP 32
     ; Vérifie que le sprite n'est pas déjà dans le cas ou sa ligne est à 32 sur son coté gauche, qu'il chevauche déjà la map et que la direction est à gauche    
     CALL NZ,NODELEFT ; c'est le cas, il ne faut donc pas effacer le caractère à gauche car c'est un caractère de la map
 
-    ; Vérifie que le sprite n'est pas déjà dans le cas ou sa ligne est à 32 sur son coté droit, qu'il chevauche déjà la map et que la direction est à droite
+    ; Vérifie que le sprite n'est pas déjà dans le cas ou sa ligne est à 32 sur son coté droit, qu'il chevauche déjà la map et que la direction est à gauche
     EX DE,HL
     PUSH HL
     ADD HL,BC
@@ -337,6 +341,22 @@ DISPLINE
     EX DE,HL
     CP 32
     CALL NZ,NODERIGHT ; c'est le cas, il ne faut donc pas effacer le caractère à droite car c'est un caractère de la map
+
+DISPLINE2
+    ; vérifie si la colonne de droite du sprite du joueur est un espace
+  ;  ADD HL,BC ; ajoute la largeur du sprite du joueur
+  ;  DEC HL
+  ;  LD A,(HL) ; (SPRJOU)
+  ;  CP 32
+  ;  JP NZ,NXTRIGHT ; ce n'est pas le cas
+    ; vérifie maintenant si l'espace du sprite du joueur est sur un bloc de la map
+  ;  PUSH HL
+  ;  EX DE,HL ; HL = VAISPOS
+  ;  ADD HL,BC
+  ;  DEC HL
+  ;  LD A,(HL)
+;    CP 32
+;    CALL NZ,NODERIGHT ; c'est le cas on n'écrase pas la map 
 
     LDIR ; (DE) <- (HL) BC-- ; affiche la ligne courante du sprite
 
@@ -348,9 +368,17 @@ DISPLINE
 TOLEFT 
     ; TODO : la condition n'est sans doute pas bonne dans tous les cas, il faut comparer par rapport aux données de la map
     ; Vérifie que le sprite n'est pas déjà dans le cas ou sa ligne est à 32 sur son coté droit, qu'il chevauche déjà la map et que la direction est à gauche
+    ;LD A,(HL)
+    ;CP 32
+    ;CALL Z,NODERIGHT ; c'est le cas, il ne faut donc pas effacer le caractère à gauche car c'est un caractère de la map
+
+    ; Vérifie que le sprite n'est pas déjà dans le cas ou sa ligne est à 32 sur son coté droit, qu'il chevauche déjà la map et que la direction est à gauche
+    ;PUSH HL
+    DEC HL
     LD A,(HL)
+    INC HL
     CP 32
-    CALL Z,NODERIGHT ; c'est le cas, il ne faut donc pas effacer le caractère à gauche car c'est un caractère de la map
+    JP Z,NXTLINE2
 
     ;supprime le caractère de droite de la ligne du sprite du joueur sur l'écran
     EX DE,HL
