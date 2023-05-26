@@ -12,7 +12,7 @@ VAISPOS DEFW 983 ; position de départ du sprite du joueur sur l'écran (15999 /
 MAPHAUT DEFB 2 ; nombre de lignes de la map à afficher sur l'écran
 MAPPOS DEFW 981 ;
 ; SPRJOU DEFM "ABCD FGH" ; Exemple de dessin sprite du joueur en mémoire (3E81) => Cas 1 OK
-SPRJOU DEFM "ABC EFG0" ; Exemple de dessin sprite du joueur en mémoire (3E81)
+SPRJOU DEFM "ABC EFG " ; Exemple de dessin sprite du joueur en mémoire (3E81)
 
 ; Fin du test
 ; Version DATA du BASIC
@@ -25,7 +25,7 @@ MAPLINE2 DEFM "Y       Z     Y"
 ; Fin du test
 
 SAVJOU DEFW 0 ; permet de tester le contenu de la ligne suivante du sprite
-SAVMEMJOU DEFW 0 ; permet de conserver l'adresse mémoire écran de la position du sprite pour la ligne suivante
+SAVECRJOU DEFW 0 ; permet de conserver l'adresse mémoire écran de la position du sprite pour la ligne suivante
 NBSPAC DEFW 0 ; permet de compter le nombre de lignes du sprite contenant un espace sur un coté en fonction du sens de déplacement demandé
 CPTLIG DEFB 0 ; permet de décrémenter le nb de lignes affichées pour un sprite
 CPTMAP DEFB 0 ; permet de décrémenter le nb de lignes affichées pour la map
@@ -182,7 +182,7 @@ EXLEFT4
 ; Décale le sprite du joueur d'une colonne vers la droite
 DROITE
     LD HL,(VAISPOS) ; 985 ; adresse mémoire de la prochaine ligne de la map du sprite à l'écran
-    LD (SAVMEMJOU),HL ; pour conserver l'adresse mémoire de la prochaine ligne de la map du sprite à l'écran
+    LD (SAVECRJOU),HL ; pour conserver l'adresse mémoire de la prochaine ligne de la map du sprite à l'écran
     PUSH HL
     LD IX,(VAISDATA)
     LD B,0
@@ -197,75 +197,71 @@ DROITE
     LD A,(HAUT) ; Charge dans le compteur le nb de lignes du sprite
     LD (CPTLIG),A
 
+    DEC HL ; 16004
 NEXTDROITE
-    ; vérifie si la colonne de droite du sprite du joueur est un espace
+    ; vérifie combien de colonnes a droite du sprite du joueur sont des espaces
     ADD HL,BC ; largeur 4
-    DEC HL ; 16007 puis 16011
     LD A,(HL) ; (16007) = 32 puis (16011) = 32
 
     CP 32
-    JP NZ,NXTRIGHT ; ce n'est pas le cas
+    JP NZ,NXTRIGHT 
     LD A,(NBSPAC)
     INC A
     LD (NBSPAC),A ; incrémente le nombre de lignes du sprite dont la valeur est 32 à droite
 
-    ; vérifie maintenant si l'espace du sprite du joueur est sur un bloc de la map avant son éventuel déplacement
-    POP HL ; 985 puis 1005
-    ADD HL,BC
-    DEC HL ; 987 puis 1007
-    LD A,(HL) ; 32
-    CP 32
-    JP NZ,NEXT2 ; c'est le cas, déplacement à droite interdit retourne dans la boucle principale ; Pas possible de mettre un RET    
-    JP NXTRIGHT2
-; Doit contrôler la valeur du contenu du sprite du joueur si 32 alors ok
-NXTRIGHT
-    ; vérifie le contenu de la map à l'écran pour la ligne traitée
-    LD HL,(SAVMEMJOU)
-    ADD HL,BC
-    
-    LD A,(HL) ; 989 puis 1009
-    CP 32
-    JP NZ,NEXT2 ; case non vide, déplacement interdit retourne dans la boucle principale ; Pas possible de mettre un RET
-
-NXTRIGHT2
     ; Sort si c'était la dernière ligne du sprite
     LD A,(CPTLIG) ; hauteur
     DEC A
-    JP Z,EXRIGHT ; dernière ligne du sprite et déplacement autorisé
+    JP Z,NEXTDROITE2 ; dernière ligne du sprite passe au prochain contrôle
 
     LD (CPTLIG),A ; enregistre le nombre de lignes du sprite du joueur restant à controler
 
-    ;PUSH HL ; 988
-    ; se positionne sur le dessin en mémoire de la prochaine ligne du sprite du joueur
-    LD HL,(SAVJOU) ; Charge HL avec l'@ de début des données de la map 16004 puis 16008
+    JP NZ,NEXTDROITE
 
-    ADD HL,BC ; 16008
-    LD (SAVJOU),HL
-    PUSH HL
-
-    PUSH BC
-    LD HL,(SAVMEMJOU)
-    LD BC,COLVIRT ; (20)
-    ADD HL,BC
-    ; LD IX,(VAISDATA)
-    ; LD B,0
-    ; LD C,(IX) ; largeur   
-    ; ADD HL,BC
-    ; DEC HL 
-    LD (SAVMEMJOU),HL
-
-    POP BC
-    POP HL
-
-    JP NEXTDROITE ; HL doit être égal à 16008
-
-EXRIGHT
+NEXTDROITE2 ; si que des espaces...
     LD A,(NBSPAC)
     LD IX,HAUT
     SUB (IX)
     CP 0
     JP NZ,EXRIGHT2
-    ; cas particulier ou toutes les colonnes du sprite du joueur on un espace à droite, il ne faut pas écraser la colonne de la map
+
+    ; ...contrôle si au moins un espace chevauche déjà la map à droite
+    LD A,(HAUT)
+    LD (NBSPAC),A ; utilise NBSPAC pour compter le nombre de chevauchements, si 0 direction droite autorisée en mode 31
+
+    LD HL,MAPLINE1 ; 16012
+    LD HL,(VAISPOS) ; 985
+    LD DE,981 ; position de la map en dur pour les tests
+    SBC HL,DE ; HL contient l'écart entre le début de la ligne de map et la position du vaisseau à l'écran (4)
+    PUSH HL
+    LD DE,MAPLINE1 ; 16012
+    PUSH DE
+    LD IX,(VAISDATA)
+
+NEXTDROITE3
+    ADC HL,DE ; 16016 puis 16031
+    LD B,0
+    LD C,(IX) ; largeur du sprite du joueur (4)
+    ADD HL,BC ; 16020 puis 16035
+    LD A,(HL)
+    CP 32
+    JP Z,NEXTDROITE4
+
+    POP DE ; 16012
+    POP HL ; 4
+    LD BC,COLREAL ; 15
+    EX DE,HL ; 16012<->4
+    ADD HL,BC ; 16027 => MAPLINE2
+    LD A,(NBSPAC)
+    DEC A
+    LD (NBSPAC),A
+    CP 0
+    JP NZ,NEXTDROITE3
+
+NEXTDROITE4
+    CP 0 ; si 0 alors cas particulier ou toutes les colonnes du sprite du joueur on un espace à droite, il ne faut pas écraser la colonne de la map
+    JP NZ,NEXT2
+
     LD A,31 ; 31 => déplacement autorisé à droite MAIS sans écraser la colonne de la map
     LD (SHWPLAY),A
 
@@ -273,29 +269,6 @@ EXRIGHT
     INC HL
     LD (VAISPOS),HL ; enregistre la nouvelle position du sprite du joueur
     JP NEXT2
-    ; JP EXRIGHT3
-
-EXRIGHT2
-    ; signale le décalage de l'affichage du sprite du joueur à droite
-    LD A,3 ; 3 => déplacement normal autorisé à droite
-    LD (SHWPLAY),A
-
-EXRIGHT3
-    LD A,(SHWPLAY)
-    CP 3
-    JP NZ,EXRIGHT4
-
-    JP NEXT2 ; déplacement normal autorisé retourne dans la boucle principale ; Pas possible de mettre un RET
-
-EXRIGHT4
-    CP 31
-    JP NZ,NEXT2 ; déplacement interdit retourne dans la boucle principale ; Pas possible de mettre un RET
-
-    LD HL,(VAISPOS)
-    INC HL
-    LD (VAISPOS),HL ; enregistre la nouvelle position du sprite du joueur
-
-    JP NEXT2 ; déplacement autorisé sans écraser la colonne de la map ; retourne dans la boucle principale ; Pas possible de mettre un RET
 
 ; Gère la fonction du tir du sprite du joueur
 TIR
