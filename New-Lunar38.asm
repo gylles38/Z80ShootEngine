@@ -12,7 +12,7 @@ VAISPOS DEFW 983 ; position de départ du sprite du joueur sur l'écran (15999 /
 MAPHAUT DEFB 2 ; nombre de lignes de la map à afficher sur l'écran
 MAPPOS DEFW 981 ;
 ; SPRJOU DEFM "ABCD FGH" ; Exemple de dessin sprite du joueur en mémoire (3E81) => Cas 1 OK
-SPRJOU DEFM "ABC EFG " ; Exemple de dessin sprite du joueur en mémoire (3E81)
+SPRJOU DEFM "ABC EFG0" ; Exemple de dessin sprite du joueur en mémoire (3E81)
 
 ; Fin du test
 ; Version DATA du BASIC
@@ -20,11 +20,12 @@ SPRJOU DEFM "ABC EFG " ; Exemple de dessin sprite du joueur en mémoire (3E81)
 
 ; Test pour map en mémoire
 MAPLINE1 DEFM "X       U     X" ; 3E8C
-MAPLINE2 DEFM "Y       U     Y"
+MAPLINE2 DEFM "Y       Z     Y"
 ;MAPDATA DEFS 500 ; 500 emplacements mémoire pour stockage datas de la map plus tard a augmenter + tard / pour l'instant la map est créée en mémoire par MAPLINE1 et MAPLINE2
 ; Fin du test
 
 SAVJOU DEFW 0 ; permet de tester le contenu de la ligne suivante du sprite
+SAVMEMJOU DEFW 0 ; permet de conserver l'adresse mémoire écran de la position du sprite pour la ligne suivante
 NBSPAC DEFW 0 ; permet de compter le nombre de lignes du sprite contenant un espace sur un coté en fonction du sens de déplacement demandé
 CPTLIG DEFB 0 ; permet de décrémenter le nb de lignes affichées pour un sprite
 CPTMAP DEFB 0 ; permet de décrémenter le nb de lignes affichées pour la map
@@ -40,7 +41,7 @@ BEGIN
     PUSH IY
 
 ; Initialisation des paramètres
-    LD HL,983
+    LD HL,985
     LD (VAISPOS),HL
 
 ; Boucle principale du moteur
@@ -180,62 +181,53 @@ EXLEFT4
 
 ; Décale le sprite du joueur d'une colonne vers la droite
 DROITE
+    LD HL,(VAISPOS) ; 985 ; adresse mémoire de la prochaine ligne de la map du sprite à l'écran
+    LD (SAVMEMJOU),HL ; pour conserver l'adresse mémoire de la prochaine ligne de la map du sprite à l'écran
+    PUSH HL
     LD IX,(VAISDATA)
     LD B,0
     LD C,(IX) ; largeur
 
-    LD HL,SPRJOU 
-    LD (SAVJOU),HL ; pour conserver l'adresse mémoire de la ligne du sprite en cours de contrôle 16004
+    LD HL,SPRJOU ; 16004
+    LD (SAVJOU),HL ; pour conserver l'adresse mémoire de la ligne du sprite en cours de contrôle 16004 puis 16008
 
-    LD HL,0
-    LD (NBSPAC),HL ; pour conserver le nombre de lignes du sprite ayant 32 à droite
-
-    LD HL,(VAISPOS) ; 985
-    PUSH HL
+    LD A,0
+    LD (NBSPAC),A ; pour conserver le nombre de lignes du sprite ayant 32 à droite
 
     LD A,(HAUT) ; Charge dans le compteur le nb de lignes du sprite
     LD (CPTLIG),A
 
+NEXTDROITE
     ; vérifie si la colonne de droite du sprite du joueur est un espace
-    LD HL,SPRJOU ; 16004
-    ADD HL,BC
-    DEC HL
-    LD A,(HL) ; (16007) = 32
-    POP HL ; (VAISPOS) 985
+    ADD HL,BC ; largeur 4
+    DEC HL ; 16007 puis 16011
+    LD A,(HL) ; (16007) = 32 puis (16011) = 32
+
     CP 32
     JP NZ,NXTRIGHT ; ce n'est pas le cas
-    ; vérifie maintenant si l'espace du sprite du joueur est sur un bloc de la map avant son éventuel déplacement
-    ADD HL,BC
-    DEC HL ; 988
-    LD A,(HL) ; 32
-    CP 32
-    JP NZ,NEXT2 ; c'est le cas, déplacement à droite interdit retourne dans la boucle principale ; Pas possible de mettre un RET    
-
-; teste si le décalage à droite est autorisé
-;NXTRIGHT
-;    INC HL
-;    LD A,(HL) ; charge le contenu de la map sur l'écran à cette adresse (989) = 85 U
-;    CP 32
-;    JP Z NXRIGHT2 ; emplacement ligne de map libre, passe à la ligne suivante
-
-; Doit contrôler la valeur du contenu du sprite du joueur si 32 alors ok
-NXTRIGHT
-    LD HL,(SAVJOU)
-    LD B,0
-    LD C,(IX) ; largeur
-    ADD HL,BC
-    DEC HL ; dernier caractère du sprite du joueur pour la ligne traitée
-
-    ;LD A,(HL)
-    ;CP 32
-    ;JP NZ,EXRIGHT2 ; déplacement interdit
-
     LD A,(NBSPAC)
     INC A
     LD (NBSPAC),A ; incrémente le nombre de lignes du sprite dont la valeur est 32 à droite
-    POP HL
 
-NXRIGHT2
+    ; vérifie maintenant si l'espace du sprite du joueur est sur un bloc de la map avant son éventuel déplacement
+    POP HL ; 985 puis 1005
+    ADD HL,BC
+    DEC HL ; 987 puis 1007
+    LD A,(HL) ; 32
+    CP 32
+    JP NZ,NEXT2 ; c'est le cas, déplacement à droite interdit retourne dans la boucle principale ; Pas possible de mettre un RET    
+    JP NXTRIGHT2
+; Doit contrôler la valeur du contenu du sprite du joueur si 32 alors ok
+NXTRIGHT
+    ; vérifie le contenu de la map à l'écran pour la ligne traitée
+    LD HL,(SAVMEMJOU)
+    ADD HL,BC
+    
+    LD A,(HL) ; 989 puis 1009
+    CP 32
+    JP NZ,NEXT2 ; case non vide, déplacement interdit retourne dans la boucle principale ; Pas possible de mettre un RET
+
+NXTRIGHT2
     ; Sort si c'était la dernière ligne du sprite
     LD A,(CPTLIG) ; hauteur
     DEC A
@@ -243,19 +235,29 @@ NXRIGHT2
 
     LD (CPTLIG),A ; enregistre le nombre de lignes du sprite du joueur restant à controler
 
-    PUSH HL ; 988
+    ;PUSH HL ; 988
     ; se positionne sur le dessin en mémoire de la prochaine ligne du sprite du joueur
-    LD HL,SPRJOU ; Charge HL avec l'@ de début des données de la map 16004
+    LD HL,(SAVJOU) ; Charge HL avec l'@ de début des données de la map 16004 puis 16008
 
-    ADD HL,BC ; 1012 2eme ligne de dessin du sprite du joueur
+    ADD HL,BC ; 16008
     LD (SAVJOU),HL
+    PUSH HL
 
-    POP HL ; 988
-    ;ADD HL,BC ; ajoute la largeur du sprite du joueur 992 ==> FAUX
+    PUSH BC
+    LD HL,(SAVMEMJOU)
     LD BC,COLVIRT ; (20)
-    ADD HL,BC ; (1008) se positionne sur l'adresse de la prochaine ligne de la map à droite de l'écran
+    ADD HL,BC
+    ; LD IX,(VAISDATA)
+    ; LD B,0
+    ; LD C,(IX) ; largeur   
+    ; ADD HL,BC
+    ; DEC HL 
+    LD (SAVMEMJOU),HL
 
-    JP NXTRIGHT
+    POP BC
+    POP HL
+
+    JP NEXTDROITE ; HL doit être égal à 16008
 
 EXRIGHT
     LD A,(NBSPAC)
@@ -266,7 +268,12 @@ EXRIGHT
     ; cas particulier ou toutes les colonnes du sprite du joueur on un espace à droite, il ne faut pas écraser la colonne de la map
     LD A,31 ; 31 => déplacement autorisé à droite MAIS sans écraser la colonne de la map
     LD (SHWPLAY),A
-    JP EXRIGHT3
+
+    LD HL,(VAISPOS)
+    INC HL
+    LD (VAISPOS),HL ; enregistre la nouvelle position du sprite du joueur
+    JP NEXT2
+    ; JP EXRIGHT3
 
 EXRIGHT2
     ; signale le décalage de l'affichage du sprite du joueur à droite
