@@ -205,9 +205,9 @@ NEXTGAUCHE8
     LD A,2 ; 2 => déplacement autorisé à gauche
     LD (SHWPLAY),A
 
-    LD HL,(VAISPOS)
-    DEC HL
-    LD (VAISPOS),HL ; enregistre la nouvelle position du sprite du joueur
+    ;LD HL,(VAISPOS)
+    ;DEC HL
+    ;LD (VAISPOS),HL ; enregistre la nouvelle position du sprite du joueur
     JP NEXT
 
 ; Décale le sprite du joueur d'une colonne vers la droite
@@ -333,9 +333,9 @@ NEXTDROITE8
     LD A,3 ; 3 => déplacement autorisé à droite
     LD (SHWPLAY),A
 
-    LD HL,(VAISPOS)
-    INC HL
-    LD (VAISPOS),HL ; enregistre la nouvelle position du sprite du joueur
+    ;LD HL,(VAISPOS)
+    ;INC HL
+    ;LD (VAISPOS),HL ; enregistre la nouvelle position du sprite du joueur
     JP NEXT2
 
 ; Gère la fonction du tir du sprite du joueur
@@ -344,7 +344,7 @@ TIR
 
 ; Fonction permettant d'afficher un sprite à l'écran
 DISSPRIT
-    LD DE,(VAISPOS) ; DE adresse position du sprite sur l'écran
+    LD DE,(VAISPOS) ; DE adresse position du sprite sur l'écran avant son déplacement
 NXTLINE
     LD B,0
     LD C,(IX+0) ; largeur (4)
@@ -363,7 +363,7 @@ TORIGHT
     EX DE,HL ; premiere ligne ok DE = 983 deuxieme ligne ok DE = 1047
     LD (HL),32
     EX DE,HL
-    ; INC DE
+    INC DE
 
 DISPLINE
    ; LD A,(SHWPLAY)
