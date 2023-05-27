@@ -1,17 +1,26 @@
    ORG 15995 ; pointeur d'adresse pour charger le code du jeux
 
 COLVIRT EQU 20 ; Ligne suivante de l'écran (le nombre de colonnes réelles est < nombre de colonnes maxi (ex : 40 colonnes à l'écran mais 64 pour passer à la ligne suivante)
-COLREAL EQU 15 ; 
+
+COLREAL EQU 15 ; Nombre de colonnes visibles à l'écran
+
 COLDIFF EQU 5 ; différence entre COLVIRT et COLREAL
 
 ; Pour test crée le sprite en mémoire (A ajouter dans les DATA du basic)
 LARGE DEFB 4 ; largeur du sprite du joueur
+
 HAUT DEFB 2 ; hauteur du sprite du joueur
+
 VAISDATA DEFW 15995 ; adresse mémoire datas du sprite du joueur (3E7B)
+
 VAISPOS DEFW 983 ; position de départ du sprite du joueur sur l'écran (15999 / 03D7)
+
 MAPHAUT DEFB 2 ; nombre de lignes de la map à afficher sur l'écran
-MAPPOS DEFW 981 ;
+
+MAPPOS DEFW 981 ; Position de départ de la map à l'écran
+
 ; SPRJOU DEFM "ABCD FGH" ; Exemple de dessin sprite du joueur en mémoire (3E81) => Cas 1 OK
+
 SPRJOU DEFM " BC  FG " ; Exemple de dessin sprite du joueur en mémoire (3E81)
 
 ; Fin du test
@@ -19,27 +28,36 @@ SPRJOU DEFM " BC  FG " ; Exemple de dessin sprite du joueur en mémoire (3E81)
 ; DATA 07,03,123,62,215,3,65,66,67,68,...
 
 ; Test pour map en mémoire
-MAPLINE1 DEFM "X       U     X" ; 3E8C
+MAPLINE1 DEFM "X       U     X"
+
 MAPLINE2 DEFM "Y       Z     Y"
+
 ;MAPDATA DEFS 500 ; 500 emplacements mémoire pour stockage datas de la map plus tard a augmenter + tard / pour l'instant la map est créée en mémoire par MAPLINE1 et MAPLINE2
 ; Fin du test
 
 SAVJOU DEFW 0 ; permet de tester le contenu de la ligne suivante du sprite
+
 NBSPAC DEFW 0 ; permet de compter le nombre de lignes du sprite contenant un espace sur un coté en fonction du sens de déplacement demandé
+
 CPTLIG DEFB 0 ; permet de décrémenter le nb de lignes affichées pour un sprite
+
 CPTMAP DEFB 0 ; permet de décrémenter le nb de lignes affichées pour la map
+
 SHWPLAY DEFB 1 ; permet de détecter si le sprite du joueur doit être réaffiché à l'écran
 ; 1 => affiche à la position de démarrage
 ; 2 => décale d'une position à gauche
 ; 3 => décale d'une position à droite
 ; 4 => décale d'une position en haut @TODO
 ; 5 => décale d'une position en bas @TODO
+; 21 => décale d'une position à gauche avec chevauchement sur la map
+; 31 => décale d'une position à droite avec chevauchement sur la map
 
 LEFTSPACES DEFB 0 ; indique si la colonne de gauche du sprite du joueur ne contient que des espaces et chevauche la map à gauche
+
 RIGHTSPACES DEFB 0 ; indique si la colonne de droite du sprite du joueur ne contient que des espaces et chevauche la map à droite
 
 BEGIN
-    PUSH IX ; 3eb1
+    PUSH IX
     PUSH IY
 
 ; Initialisation des paramètres
@@ -49,16 +67,15 @@ BEGIN
     LD (LEFTSPACES),A
     LD (RIGHTSPACES),A
 
-; Boucle principale du moteur
-BOUCLE
-;    LD E,01              ; 
-;    RST 20h              ; DEFB 31H
+BOUCLE ; Boucle principale du moteur
+;    LD E,01 ;
+;    RST 20h ; DEFB 31H
 
     ; Dessine la map à l'écran TODO : gérer le décalage horizontal ou vertical de la map
     LD IX,(VAISDATA)
-    LD A,(IX+6)         ; Charge dans le compteur le nb de lignes a afficher de la map
+    LD A,(MAPHAUT) ; Charge dans le compteur le nb de lignes a afficher de la map
 
-    LD HL,MAPLINE1      ; Charge HL et IX avec l'@ de début des données de la map
+    LD HL,MAPLINE1 ; Charge HL et IX avec l'@ de début des données de la map
     LD IX,MAPLINE1
 
     LD (CPTMAP),A
@@ -81,13 +98,12 @@ NEXT3
     LD (CPTLIG),A
     CALL DISSPRIT
 
-SUITE
+SUITE ; Fin de la boucle principale du moteur
     JP BOUCLE
 
 ; TODO : étudier le regroupement du code similaire de GAUCHE et DROITE
 
-; Décale le sprite du joueur d'une colonne vers la gauche
-GAUCHE
+GAUCHE ; Décale le sprite du joueur d'une colonne vers la gauche
     LD A,(LEFTSPACES)
     CP 21
     JP Z,NEXT2 ; la colonne de gauche du sprite contient uniquement des espaces et le sprite chevauche déjà la map à gauche, déplacement interdit
@@ -108,11 +124,9 @@ GAUCHE
     LD (CPTLIG),A
 
     ;DEC HL ; 16004
-NEXTGAUCHE
-    ; vérifie combien de colonnes a gauche du sprite du joueur sont des espaces
+NEXTGAUCHE ; vérifie combien de colonnes a gauche du sprite du joueur sont des espaces
     LD A,(HL) ; (16004) = 32 puis (16008) = 32
     ADD HL,BC ; largeur 4
-    ;DEC HL
 
     CP 32
     JP NZ,NEXTGAUCHE5
@@ -148,7 +162,7 @@ NEXTGAUCHE2 ; si colonne de gauche du sprite du joueur n'a que des espaces...
     PUSH DE
     LD IX,(VAISDATA)
 
-NEXTGAUCHE3
+NEXTGAUCHE3 ; calcule les données pour la ligne suivante du sprite
     ADD HL,DE ; 16016 puis 16031
     DEC HL ; 16015 puis 16030
     LD A,(HL)
@@ -179,8 +193,7 @@ NEXTGAUCHE4
 
     JP NEXT
 
-NEXTGAUCHE5
-    ; vérifie que la map est libre à gauche en mémoire écran
+NEXTGAUCHE5 ; vérifie que la map est libre à gauche en mémoire écran
     LD A,(HAUT)
     LD (NBSPAC), A
 
@@ -212,8 +225,7 @@ NEXTGAUCHE8
 
     JP NEXT
 
-; Décale le sprite du joueur d'une colonne vers la droite
-DROITE
+DROITE ; Décale le sprite du joueur d'une colonne vers la droite
     LD A,(RIGHTSPACES)
     CP 31
     JP Z,NEXT2 ; la colonne de droite du sprite contient uniquement des espaces et le sprite chevauche déjà la map à droite, déplacement interdit
@@ -234,8 +246,7 @@ DROITE
     LD (CPTLIG),A
 
     DEC HL ; 16004
-NEXTDROITE
-    ; vérifie combien de colonnes a droite du sprite du joueur sont des espaces
+NEXTDROITE ; vérifie combien de colonnes a droite du sprite du joueur sont des espaces
     ADD HL,BC ; largeur 4
     LD A,(HL) ; (16007) = 32 puis (16011) = 32
 
@@ -255,7 +266,7 @@ NEXTDROITE
 
     JP NZ,NEXTDROITE
 
-NEXTDROITE2 ; si que des espaces...
+NEXTDROITE2 ; si colonne de droite du sprite du joueur n'a que des espaces...
     LD A,(NBSPAC)
     LD IX,HAUT
     SUB (IX)
@@ -274,7 +285,7 @@ NEXTDROITE2 ; si que des espaces...
     PUSH DE
     LD IX,(VAISDATA)
 
-NEXTDROITE3
+NEXTDROITE3 ; calcule les données pour la ligne suivante du sprite
     ADD HL,DE ; 16016 puis 16031
     LD B,0
     LD C,(IX) ; largeur du sprite du joueur (4)
@@ -308,8 +319,7 @@ NEXTDROITE4
 
     JP NEXT2
 
-NEXTDROITE5
-    ; vérifie que la map est libre à droite en mémoire écran
+NEXTDROITE5 ; vérifie que la map est libre à droite en mémoire écran
     LD A,(HAUT)
     LD (NBSPAC), A
 
@@ -343,12 +353,10 @@ NEXTDROITE8
     LD (LEFTSPACES),A ; désactive le flag de chevauchement à gauche
     JP NEXT2
 
-; Gère la fonction du tir du sprite du joueur
-TIR
+TIR ; Gère la fonction du tir du sprite du joueur
     JP NEXT3 ; Pas possible de mettre un RET
 
-; Fonction permettant d'afficher un sprite à l'écran
-DISSPRIT
+DISSPRIT ; Fonction permettant d'afficher un sprite à l'écran
     LD DE,(VAISPOS) ; DE adresse position du sprite sur l'écran avant son déplacement
 NXTLINE
     LD B,0
@@ -392,16 +400,14 @@ DISPLINE3
     DEC BC
     JP DISPLINE4
 
-DISPLINE2
-    ; cas ou aucune direction mais le sprite du joueur chevauche déjà la map à droite, il ne faut pas effacer la colonne droite de la map
+DISPLINE2 ; cas ou aucune direction mais le sprite du joueur chevauche déjà la map à droite, il ne faut pas effacer la colonne droite de la map
     LD A,(RIGHTSPACES)
     CP 31
     JP NZ,DISPLINE5
     DEC BC
     JP DISPLINE4
 
-DISPLINE5
-    ; cas ou aucune direction mais le sprite du joueur chevauche déjà la map à gauche, il ne faut pas effacer la colonne gauche de la map
+DISPLINE5 ; cas ou aucune direction mais le sprite du joueur chevauche déjà la map à gauche, il ne faut pas effacer la colonne gauche de la map
     LD A,(LEFTSPACES)
     CP 21
     JP NZ,DISPLINE4
@@ -419,8 +425,7 @@ NXTLINE2
     JP NZ NXTLINE5
     LD (LEFTSPACES),A ; conserve l'information que la colonne de gauche du sprite du joueur à des espaces et que le sprite chevauche déjà la map
 
-NXTLINE5
-    ; Sort si c'était la dernière ligne du sprite
+NXTLINE5 ; Sort si c'était la dernière ligne du sprite sinon calcule les données nécessaires pour affichage de la prochaine ligne du sprite
     LD A,(CPTLIG) ; hauteur
     DEC A
     JP Z,UPDEND ; sort de la function
@@ -446,8 +451,7 @@ NXTLINE5
     DEC BC
     JP DISPLINE4
 
-NXTLINE4
-    ; cas ou aucune direction mais le sprite du joueur chevauche déjà la map à droite, il ne faut pas effacer la colonne droite de la map
+NXTLINE4 ; cas ou aucune direction mais le sprite du joueur chevauche déjà la map à droite, il ne faut pas effacer la colonne droite de la map
     LD A,(RIGHTSPACES)
     CP 31
     JP NZ,DISPLINE6
@@ -456,8 +460,7 @@ NXTLINE4
     DEC BC
     JP DISPLINE4
 
-DISPLINE6
-    ; cas ou aucune direction mais le sprite du joueur chevauche déjà la map à gauche, il ne faut pas effacer la colonne gauche de la map
+DISPLINE6 ; cas ou aucune direction mais le sprite du joueur chevauche déjà la map à gauche, il ne faut pas effacer la colonne gauche de la map
     LD A,(LEFTSPACES)
     CP 21
     JP NZ,DISPLINE4
@@ -475,7 +478,6 @@ NXTLINE3
     JP DISPLINE4
 
 UPDEND
-    ;LD (VAISPOS),HL
     LD A,0
     LD (SHWPLAY),A
 
@@ -484,9 +486,10 @@ UPDEND
 DRAWMAP ; affiche la map depuis la mémoire sur l'écran
     ; Test placement de la map en mémoire sur l'écran - simulation sur 2 lignes
     ; ligne 1
-    LD DE,981
+    LD DE,(MAPPOS)
+
     LD BC,COLREAL
-    LDIR ;(DE) <- (HL) BC--  (981 / 03D7) <- (16024 / 3E98) affiche la ligne courante du sprite
+    LDIR ;(DE) <- (HL) BC--
 
     EX DE,HL
     LD BC,COLDIFF
@@ -498,19 +501,6 @@ DRAWMAP ; affiche la map depuis la mémoire sur l'écran
     LDIR
     ;:Fin du test
     RET
-
-; le caractère du joueur est un espace mais le caractère de la ligne de la map à gauche n'en est pas un, il ne faut donc pas effacer le caractère de la map et passer au caractère suivant à afficher
-NODELEFT
-    INC HL
-    INC DE
-    DEC BC
-    RET
-
-; le caractère du joueur est un espace mais le caractère de la ligne de la map à droite n'en est pas un, il ne faut donc pas effacer le caractère de la map et passer au caractère suivant à afficher
-NODERIGHT
-   DEC BC
-    RET
-
 
 FIN
     POP IY
